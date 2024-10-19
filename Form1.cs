@@ -17,16 +17,24 @@ namespace LabWhile_6
         readonly string patternConst = @"(true)";
         readonly string patternIsWhile = @"^while\s*\(\s*([a-zA-Z]+[0-9]+)\s*([\+\-\*\/])\s*([a-zA-Z]+[0-9]+)\s*:=\s*(true)\s*\)\s*\{((\s*([a-zA-Z]+[0-9]+)\s*([\+\-\*\/])\s*([a-zA-Z]+[0-9]+)\s*)*;)*\s*\}$";
 
-        private List<string> Tokens { get; set; }
+
+        /// <summary>
+        /// хеш-таблица для идентификаторов и описания
+        /// </summary>
+        private Token[] _hashTable = new Token[1000];
 
         public Form1()
         {
             InitializeComponent();
-            //textBoxUserString.Text = "while(as22+ee4:=true){as22+ee4;}";
+            // Установка максимального значения для numericUpDown1
+            numericUpDown1.Maximum = _hashTable.Length - 1;
+           // textBoxUserString.Text = "while(as22+ee4:=true){Xs22+e44;}";
         }
 
         private void buttonCheck_Click(object sender, EventArgs e)
         {
+            ClearHashTableAndListView();
+
             string temp = textBoxUserString.Text.Trim();
             
             bool isWhile = Regex.IsMatch(temp, patternIsWhile);
@@ -38,25 +46,23 @@ namespace LabWhile_6
                 MatchCollection matchesVar = Regex.Matches(temp, patternVar);
                 MatchCollection matchesConst = Regex.Matches(temp, patternConst);
 
-                Result(matchesVar, matchesConst);
+                CreateHashTable(matchesVar, matchesConst);
 
-                listViewMain.Items.Clear();
+               // listViewMain.Items.Clear();
+
                 
-                int addressCounter = 1; // Счётчик для адреса токенов
 
-                if (Tokens != null)
+                if(_hashTable.Length > 0)
                 {
-                    foreach (var token in Tokens)
+                    for(int i=0; i < _hashTable.Length; i++)
                     {
-                        ListViewItem item = new ListViewItem(addressCounter.ToString()); // columnAddress
-                        item.SubItems.Add(token); // columnName
-                        if (addressCounter == 1)
+                        if (_hashTable[i] != null)
                         {
-                            item.SubItems.Add("константа символов"); // columnDescription
+                            ListViewItem item = new ListViewItem((i+1).ToString());
+                            item.SubItems.Add(_hashTable[i].Name);
+                            item.SubItems.Add(_hashTable[i].Description);
+                            listViewMain.Items.Add(item);
                         }
-                        item.SubItems.Add("целочисленная переменная"); // columnDescription
-                        listViewMain.Items.Add(item);
-                        addressCounter++;
                     }
                 }
             }
@@ -68,22 +74,88 @@ namespace LabWhile_6
             }
         }
 
-        
-        private void Result(MatchCollection matchesVar, MatchCollection matchesConst)
-        {
-            List<string> result = new List<string>();
 
+        /// <summary>
+        /// Метод для очистки массива хеш-таблицы и ListView
+        /// </summary>
+        private void ClearHashTableAndListView()
+        {            
+            listViewMain.Items.Clear();
+            _hashTable = new Token[1000]; // Заново создаем пустой массив того же размера
+        }
+
+        private void CreateHashTable(MatchCollection matchesVar, MatchCollection matchesConst)
+        {          
             foreach (Match match in matchesConst)
             {
-                result.Add(match.Value);
+                string description = "константа символов";
+                string name = match.Value;
+                //вычисляем индекс для вставки
+                int index = (match.Value.GetHashCode() == int.MinValue) ? 0 : Math.Abs(match.Value.GetHashCode()) % _hashTable.Length;
+                Insert(index,name,description);
             }
             foreach (Match match in matchesVar)
             {
-                result.Add(match.Value);
+                string description = "целочисленная переменная";
+                string name = match.Value;
+                //вычисляем индекс для вставки
+                int index = (match.Value.GetHashCode() == int.MinValue) ? 0 : Math.Abs(match.Value.GetHashCode()) % _hashTable.Length;
+                Insert(index,name,description);
             }
-            Tokens = result;
         }
 
 
+        Token CheckByAddress(int index)
+        {
+            if (_hashTable[index] != null)
+            {
+                return _hashTable[index];
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// вставка в таблицу
+        /// </summary>
+        /// <param name="index">индекс вставки</param>
+        /// <param name="name">название идентификатора</param>
+        /// <param name="description">описание идентификатора</param>
+        /// <returns></returns>
+        bool Insert(int index, string name, string description)
+        {
+            if (_hashTable[index] == null)
+            {
+                _hashTable[index] = new Token(name,description);
+                return true;
+            }
+            // Линейное пробирование при коллизии (один из методов свободной адресации)
+            int startIndex = index;
+            while (_hashTable[index] != null)
+            { 
+                index = (index + 1) % _hashTable.Length; // Увеличиваем индекс на 1 с возвратом к началу при выходе за пределы массива
+                if (index == startIndex)
+                {
+                    return false; // Таблица заполнена, вставка не удалась
+                }
+            }
+            // Вставляем элемент в первую свободную ячейку
+            _hashTable[index] = new Token(name, description);
+            return true;
+        }
+
+        // обаботка проверки по адресу
+        private void button1_Click(object sender, EventArgs e)
+        {
+            int index = Convert.ToInt32(numericUpDown1.Value);
+            Token token = CheckByAddress(index - 1);
+            if(token != null)
+            {
+                MessageBox.Show(token.ToString());
+            }
+            else
+            {
+                MessageBox.Show("NotFound","Error 404",MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
     }
 }
